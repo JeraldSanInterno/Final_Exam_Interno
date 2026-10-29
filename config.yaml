@@ -1,0 +1,7 @@
+ansible_managed_user: "Interno"
+
+#Enterprise Web Service Configuration---Nginx
+web_service_port: 8081
+
+# Monitoring Tool Configuration---------Prometheus
+monitoring_port: 9090

@@ -1,0 +1,50 @@
+---
+- name: Final Exam - Enterprise Services & Monitoring via Containerization
+  hosts: all
+  become: true
+  vars_files:
+    - config.yaml
+
+  tasks:
+    # Procedure Step 4.4: Change MOTD to "Ansible Managed by Interno"
+    - name: Update /etc/motd with Ansible Managed message
+      ansible.builtin.copy: { dest: "/etc/motd", content: "Ansible Managed by Interno\n", mode: "0644" }
+
+    # Core Requirement: Install Docker Engine on Debian/Ubuntu
+    - name: Install Docker and Python SDK on Debian/Ubuntu systems
+      when: ansible_os_family == "Debian"
+      ansible.builtin.apt: { name: ["docker.io", "python3-docker"], state: present, update_cache: yes }
+
+    # Core Requirement: Install Docker Engine on RedHat/CentOS
+    - name: Add Docker CE repository on RedHat/CentOS
+      when: ansible_os_family == "RedHat"
+      ansible.builtin.get_url: { url: "https://download.docker.com/linux/centos/docker-ce.repo", dest: "/etc/yum.repos.d/docker-ce.repo" }
+
+    - name: Install Docker CE on RedHat/CentOS systems
+      when: ansible_os_family == "RedHat"
+      ansible.builtin.dnf: { name: ["docker-ce", "docker-ce-cli", "containerd.io"], state: present, update_cache: yes, allowerasing: yes }
+
+    - name: Ensure Docker service is running and enabled
+      ansible.builtin.service: { name: "docker", state: started, enabled: yes }
+
+    # Procedure Step 3.1: Containerized Enterprise Service (Nginx)
+    - name: Deploy Containerized Enterprise Web Service (Nginx) - Debian
+      when: ansible_os_family == "Debian"
+      community.docker.docker_container: { name: "enterprise_nginx", image: "nginx:latest", state: started, restart_policy: "always", published_ports: ["{{ web_service_port }}:80"] }
+
+    - name: Deploy Containerized Enterprise Web Service (Nginx) - CentOS
+      when: ansible_os_family == "RedHat"
+      ansible.builtin.command: "docker run -d --name enterprise_nginx --restart always -p {{ web_service_port }}:80 nginx:latest"
+      register: run_nginx
+      failed_when: run_nginx.rc != 0 and "is already in use" not in run_nginx.stderr
+
+    # Procedure Step 3.2: Containerized Monitoring Tool (Prometheus)
+    - name: Deploy Containerized Monitoring Tool (Prometheus) - Debian
+      when: ansible_os_family == "Debian"
+      community.docker.docker_container: { name: "monitoring_prometheus", image: "prom/prometheus:latest", state: started, restart_policy: "always", published_ports: ["{{ monitoring_port }}:9090"] }
+
+    - name: Deploy Containerized Monitoring Tool (Prometheus) - CentOS
+      when: ansible_os_family == "RedHat"
+      ansible.builtin.command: "docker run -d --name monitoring_prometheus --restart always -p {{ monitoring_port }}:9090 prom/prometheus:latest"
+      register: run_prom
+      failed_when: run_prom.rc != 0 and "is already in use" not in run_prom.stderr
